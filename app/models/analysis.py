@@ -17,9 +17,6 @@ class CheatingRiskAnalysis(Base):
     participant_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), nullable=False, index=True
     )
-    exam_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), nullable=False, index=True
-    )
 
     risk_score: Mapped[float] = mapped_column(Float, nullable=False)
     cheating_probability: Mapped[float] = mapped_column(Float, nullable=False)

@@ -13,7 +13,9 @@ SYSTEM_INSTRUCTION = (
     "Your task is to summarize observed behaviors from an online exam monitoring system. "
     "Never claim cheating occurred. Only describe objective evidence. "
     "Mention the strongest contributing factors. "
-    "Use concise academic language. "
+    "Use simple, non-technical language that anyone can understand. "
+    "Avoid terms like 'instances', 'frames', or 'events' — use plain words like 'detected', 'observed', or 'seen'. "
+    "For phone detection, say 'phone was visible' or 'possible phone use was detected'. "
     "Keep the summary under 4 sentences. "
     "End with a manual review recommendation when the risk level is Elevated or higher."
 )
@@ -26,12 +28,12 @@ FEATURE_MAP: list[tuple[str, str, str]] = [
     ("fullscreen_exit_attempts", "fullscreen_exit_attempt", "fullscreen exit attempts"),
     ("face_missing_duration", "face_missing_per_sec", "face missing (seconds)"),
     ("look_away_duration", "look_away_per_sec", "look away (seconds)"),
-    ("multiple_face_events", "multiple_face_event", "multiple face events"),
-    ("phone_detected_frames", "phone_detected_frame", "phone detections"),
-    ("tablet_detected_frames", "tablet_detected_frame", "tablet detections"),
-    ("book_detected_frames", "book_detected_frame", "book detections"),
+    ("multiple_face_events", "multiple_face_event", "multiple faces detected"),
+    ("phone_detected_frames", "phone_detected_frame", "phone detected"),
+    ("tablet_detected_frames", "tablet_detected_frame", "tablet detected"),
+    ("book_detected_frames", "book_detected_frame", "book or notes detected"),
     ("side_glance_count", "side_glance", "side glances"),
-    ("speaking_events", "speaking_event", "speaking events"),
+    ("speaking_events", "speaking_event", "speaking detected"),
     ("eyes_closed_duration", "eyes_closed_per_sec", "eyes closed (seconds)"),
 ]
 

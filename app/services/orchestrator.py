@@ -97,24 +97,21 @@ class AnalysisOrchestrator:
     async def run_analysis(
         self,
         participant_id: str,
-        exam_id: str,
     ) -> CheatingRiskAnalysis:
         pid = uuid.UUID(participant_id)
-        eid = uuid.UUID(exam_id)
         start = time.monotonic()
 
         try:
             # Step 1 — load participant
             t0 = time.monotonic()
             participant = await _retry(
-                self.participant_repo.find_by_participant_and_exam,
-                participant_id,
-                exam_id,
+                self.participant_repo.find_by_id,
+                pid,
                 step_name="load_participant",
             )
             if participant is None:
                 raise ValueError(
-                    f"Participant {participant_id} / exam {exam_id} not found"
+                    f"Participant {participant_id} not found"
                 )
             analysis_step_duration.labels(step="load_participant").observe(
                 time.monotonic() - t0
@@ -190,7 +187,6 @@ class AnalysisOrchestrator:
             analysis = await _retry(
                 self.analysis_result_repo.save_with_status,
                 participant_id=pid,
-                exam_id=eid,
                 risk_score=score,
                 cheating_probability=probability,
                 risk_level=risk_level,
@@ -215,7 +211,6 @@ class AnalysisOrchestrator:
             logger.info(
                 "analysis_completed",
                 participant_id=participant_id,
-                exam_id=exam_id,
                 risk_score=score,
                 risk_level=risk_level,
                 duration_seconds=round(duration, 2),

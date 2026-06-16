@@ -19,20 +19,18 @@ router = APIRouter(prefix="/analysis", tags=["analysis"])
 
 
 @router.get(
-    "/result/{set_id}/{student_id}",
+    "/result/{participant_id}",
     response_model=AnalysisResultResponse,
     responses={404: {"model": ErrorResponse}},
 )
 async def get_analysis_result(
-    set_id: str,
-    student_id: str,
+    participant_id: str,
     repo: AnalysisResultRepository = Depends(get_analysis_result_repo),
 ) -> AnalysisResultResponse:
     import uuid
 
-    pid = uuid.UUID(student_id)
-    eid = uuid.UUID(set_id)
-    result = await repo.find_by_participant_and_exam(pid, eid)
+    pid = uuid.UUID(participant_id)
+    result = await repo.find_by_participant(pid)
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -47,7 +45,6 @@ async def get_analysis_result(
     return AnalysisResultResponse(
         id=str(result.id),
         participant_id=str(result.participant_id),
-        exam_id=str(result.exam_id),
         risk_score=result.risk_score,
         cheating_probability=result.cheating_probability,
         risk_level=result.risk_level,
@@ -61,31 +58,27 @@ async def get_analysis_result(
 
 
 @router.post(
-    "/run/{set_id}/{student_id}",
+    "/run/{participant_id}",
     response_model=RunAnalysisResponse,
     responses={404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}},
 )
 async def run_analysis(
-    set_id: str,
-    student_id: str,
+    participant_id: str,
     orchestrator: AnalysisOrchestrator = Depends(get_analysis_orchestrator),
 ) -> RunAnalysisResponse:
     import uuid
     from uuid import UUID
 
-    pid = UUID(student_id)
-    eid = UUID(set_id)
+    pid = UUID(participant_id)
 
-    existing = await orchestrator.analysis_result_repo.find_by_participant_and_exam(
-        pid, eid
-    )
+    existing = await orchestrator.analysis_result_repo.find_by_participant(pid)
     if existing is not None:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Analysis already exists. Use POST /analysis/retry/{set_id}/{student_id} to re-run.",
+            detail="Analysis already exists. Use POST /analysis/retry/{participant_id} to re-run.",
         )
 
-    result = await orchestrator.run_analysis(student_id, set_id)
+    result = await orchestrator.run_analysis(participant_id)
     return RunAnalysisResponse(
         status="completed",
         analysis_id=str(result.id),
@@ -95,29 +88,27 @@ async def run_analysis(
 
 
 @router.post(
-    "/retry/{set_id}/{student_id}",
+    "/retry/{participant_id}",
     response_model=RunAnalysisResponse,
     responses={404: {"model": ErrorResponse}},
 )
 async def retry_analysis(
-    set_id: str,
-    student_id: str,
+    participant_id: str,
     orchestrator: AnalysisOrchestrator = Depends(get_analysis_orchestrator),
 ) -> RunAnalysisResponse:
     import uuid
     from uuid import UUID
 
-    pid = UUID(student_id)
-    eid = UUID(set_id)
+    pid = UUID(participant_id)
 
-    deleted = await orchestrator.analysis_result_repo.delete_and_reset(pid, eid)
+    deleted = await orchestrator.analysis_result_repo.delete_and_reset(pid)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="No existing analysis result to retry. Use POST /analysis/run/{set_id}/{student_id} first.",
+            detail="No existing analysis result to retry. Use POST /analysis/run/{participant_id} first.",
         )
 
-    result = await orchestrator.run_analysis(student_id, set_id)
+    result = await orchestrator.run_analysis(participant_id)
     return RunAnalysisResponse(
         status="completed",
         analysis_id=str(result.id),
@@ -135,7 +126,6 @@ async def list_pending_participants(
         {
             "id": str(r.id),
             "participant_id": str(r.student_id),
-            "exam_id": str(r.set_id),
         }
         for r in records
     ]

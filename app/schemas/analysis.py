@@ -11,7 +11,6 @@ class SuspiciousEvent(BaseModel):
 
 class AnalysisResult(BaseModel):
     participant_id: str
-    exam_id: str
     risk_score: float
     cheating_probability: float
     risk_level: str

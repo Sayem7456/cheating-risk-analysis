@@ -65,19 +65,18 @@ def _build_service() -> AnalysisOrchestrator:
 
 
 @celery_app.task(bind=True, max_retries=3, default_retry_delay=60)
-def analyze_exam_session(self, participant_id: str, exam_id: str) -> dict:
+def analyze_exam_session(self, participant_id: str) -> dict:
     """Celery task to run full analysis pipeline for one exam session."""
     import asyncio
 
     try:
         service = _build_service()
         result = asyncio.run(
-            service.run_analysis(participant_id, exam_id)
+            service.run_analysis(participant_id)
         )
         logger.info(
             "task_completed",
             participant_id=participant_id,
-            exam_id=exam_id,
             risk_score=result.risk_score,
         )
         return {
@@ -86,5 +85,5 @@ def analyze_exam_session(self, participant_id: str, exam_id: str) -> dict:
             "risk_level": result.risk_level,
         }
     except Exception as exc:
-        logger.exception("task_failed", participant_id=participant_id, exam_id=exam_id)
+        logger.exception("task_failed", participant_id=participant_id)
         raise self.retry(exc=exc)

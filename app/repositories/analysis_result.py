@@ -18,27 +18,24 @@ class AnalysisResultRepository:
         self._analysis_repo = CheatingRiskAnalysisRepository(session)
         self._participant_repo = ItemSetParticipantRepository(session)
 
-    async def find_by_participant_and_exam(
+    async def find_by_participant(
         self,
         participant_id: uuid.UUID,
-        exam_id: uuid.UUID,
     ) -> CheatingRiskAnalysis | None:
-        return await self._analysis_repo.find_by_participant_and_exam(
-            str(participant_id), str(exam_id)
+        return await self._analysis_repo.find_by_participant(
+            str(participant_id)
         )
 
     async def delete_and_reset(
         self,
         participant_id: uuid.UUID,
-        exam_id: uuid.UUID,
     ) -> bool:
-        deleted = await self._analysis_repo.delete_by_participant_and_exam(
-            str(participant_id), str(exam_id)
+        deleted = await self._analysis_repo.delete_by_participant(
+            str(participant_id)
         )
         if deleted:
             await self._participant_repo.update_analysis_status(
                 participant_id=participant_id,
-                exam_id=exam_id,
                 status=None,
             )
         return deleted
@@ -46,7 +43,6 @@ class AnalysisResultRepository:
     async def save_with_status(
         self,
         participant_id: uuid.UUID,
-        exam_id: uuid.UUID,
         risk_score: float,
         cheating_probability: float,
         risk_level: str,
@@ -57,7 +53,6 @@ class AnalysisResultRepository:
     ) -> CheatingRiskAnalysis:
         analysis = await self._analysis_repo.upsert_analysis(
             participant_id=participant_id,
-            exam_id=exam_id,
             risk_score=risk_score,
             cheating_probability=cheating_probability,
             risk_level=risk_level,
@@ -69,7 +64,6 @@ class AnalysisResultRepository:
 
         await self._participant_repo.update_analysis_status(
             participant_id=participant_id,
-            exam_id=exam_id,
             status="COMPLETED",
         )
 

@@ -51,7 +51,7 @@ def discover_and_dispatch() -> int:
         with engine.connect() as conn:
             rows = conn.execute(
                 text(
-                    "SELECT id, student_id, set_id "
+                    "SELECT id "
                     "FROM item_set_participant "
                     "WHERE is_evaluated = TRUE "
                     "AND analysis_status IS NULL "
@@ -62,8 +62,6 @@ def discover_and_dispatch() -> int:
 
             for row in rows:
                 record_id = str(row[0])
-                student_id = str(row[1])
-                set_id = str(row[2])
 
                 if redis_client:
                     lock_key = f"{LOCK_PREFIX}{record_id}"
@@ -72,7 +70,7 @@ def discover_and_dispatch() -> int:
 
                 celery_app.send_task(
                     "app.workers.tasks.analyze_exam_session",
-                    args=[student_id, set_id],
+                    args=[record_id],
                 )
                 dispatched += 1
 

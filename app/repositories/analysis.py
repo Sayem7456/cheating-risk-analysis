@@ -10,26 +10,23 @@ from app.repositories.base import BaseRepository
 class CheatingRiskAnalysisRepository(BaseRepository[CheatingRiskAnalysis]):
     entity_class = CheatingRiskAnalysis
 
-    async def delete_by_participant_and_exam(
+    async def delete_by_participant(
         self,
         participant_id: str,
-        exam_id: str,
     ) -> bool:
-        existing = await self.find_by_participant_and_exam(participant_id, exam_id)
+        existing = await self.find_by_participant(participant_id)
         if existing is None:
             return False
         await self.session.delete(existing)
         await self.session.flush()
         return True
 
-    async def find_by_participant_and_exam(
+    async def find_by_participant(
         self,
         participant_id: str,
-        exam_id: str,
     ) -> CheatingRiskAnalysis | None:
         stmt = select(CheatingRiskAnalysis).where(
             CheatingRiskAnalysis.participant_id == uuid.UUID(participant_id),
-            CheatingRiskAnalysis.exam_id == uuid.UUID(exam_id),
         )
         result = await self.session.execute(stmt)
         return result.scalar_one_or_none()
@@ -37,7 +34,6 @@ class CheatingRiskAnalysisRepository(BaseRepository[CheatingRiskAnalysis]):
     async def upsert_analysis(
         self,
         participant_id: uuid.UUID,
-        exam_id: uuid.UUID,
         risk_score: float,
         cheating_probability: float,
         risk_level: str,
@@ -46,8 +42,8 @@ class CheatingRiskAnalysisRepository(BaseRepository[CheatingRiskAnalysis]):
         suspicious_timeline: list[dict[str, Any]] | None = None,
         ai_summary: str | None = None,
     ) -> CheatingRiskAnalysis:
-        existing = await self.find_by_participant_and_exam(
-            str(participant_id), str(exam_id)
+        existing = await self.find_by_participant(
+            str(participant_id)
         )
         if existing:
             existing.risk_score = risk_score
@@ -62,7 +58,6 @@ class CheatingRiskAnalysisRepository(BaseRepository[CheatingRiskAnalysis]):
 
         analysis = CheatingRiskAnalysis(
             participant_id=participant_id,
-            exam_id=exam_id,
             risk_score=risk_score,
             cheating_probability=cheating_probability,
             risk_level=risk_level,

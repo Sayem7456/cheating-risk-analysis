@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     weight_face_missing_per_sec: float = 0.3
     weight_look_away_per_sec: float = 0.1
     weight_multiple_face_event: float = 20.0
-    weight_phone_detected_frame: float = 0.6
+    weight_phone_detected_frame: float = 3.0
     weight_tablet_detected_frame: float = 0.8
     weight_book_detected_frame: float = 0.5
     weight_side_glance: float = 1.5
