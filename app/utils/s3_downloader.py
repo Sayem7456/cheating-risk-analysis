@@ -142,3 +142,41 @@ class S3VideoDownloader:
             import shutil
             shutil.rmtree(session_dir)
             logger.info("cleaned_up_session", session_id=session_id)
+
+    def upload_merged_video(
+        self,
+        local_path: str,
+        session_id: str,
+        filename: str = "merged_video.webm",
+    ) -> str:
+        """Upload merged video to S3 and return the S3 key.
+
+        Args:
+            local_path: Local path to the merged video file.
+            session_id: Session identifier for S3 key prefix.
+            filename: Output filename.
+
+        Returns:
+            S3 key of the uploaded file.
+        """
+        s3_key = f"{session_id}/face/{filename}"
+
+        if not os.path.isfile(local_path):
+            raise FileNotFoundError(f"Merged video not found: {local_path}")
+
+        file_size = os.path.getsize(local_path)
+        logger.info(
+            "merged_upload_started",
+            local_path=local_path,
+            s3_key=s3_key,
+            size=file_size,
+        )
+
+        self.client.upload_file(local_path, self.bucket, s3_key)
+
+        logger.info(
+            "merged_upload_completed",
+            s3_key=s3_key,
+            size=file_size,
+        )
+        return s3_key

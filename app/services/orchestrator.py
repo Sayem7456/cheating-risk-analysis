@@ -117,6 +117,12 @@ class AnalysisOrchestrator:
                 time.monotonic() - t0
             )
 
+            # Set status to ANALYZING
+            await self.participant_repo.update_analysis_status(
+                participant_id=pid,
+                status="Analyzing",
+            )
+
             activity_log = participant.activity_log or []
             face_records = participant.face_records or []
 
@@ -133,7 +139,7 @@ class AnalysisOrchestrator:
 
             # Steps 3–5 — video download, frame extraction, face analysis, object detection
             t0 = time.monotonic()
-            face_features, face_results, detection_results = await _retry(
+            face_features, face_results, detection_results, merged_s3_key = await _retry(
                 self.video_analyzer.analyze,
                 face_records,
                 step_name="video_analysis",
@@ -198,6 +204,31 @@ class AnalysisOrchestrator:
             )
             analysis_step_duration.labels(step="save_results").observe(
                 time.monotonic() - t0
+            )
+
+            # Step 11 — replace face_records with merged video link
+            if merged_s3_key:
+                from datetime import datetime, timezone
+                from app.core.config import settings
+
+                merged_url = (
+                    f"https://{settings.aws_s3_bucket}"
+                    f".s3.{settings.aws_region}.amazonaws.com"
+                    f"/{merged_s3_key}"
+                )
+                await self.participant_repo.update_face_records(
+                    participant_id=pid,
+                    face_records=[{
+                        "s3_key": merged_s3_key,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "video_url": merged_url,
+                    }],
+                )
+
+            # Set status to COMPLETED
+            await self.participant_repo.update_analysis_status(
+                participant_id=pid,
+                status="Completed",
             )
 
             # Record metrics

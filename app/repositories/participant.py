@@ -17,7 +17,21 @@ class ItemSetParticipantRepository(BaseRepository[ItemSetParticipant]):
         participant = await self.find_by_id(participant_id)
         if participant is not None:
             participant.analysis_status = status
-            await self.update(participant)
+            await self.session.merge(participant)
+            await self.session.flush()
+            await self.session.commit()
+
+    async def update_face_records(
+        self,
+        participant_id: uuid.UUID,
+        face_records: list,
+    ) -> None:
+        participant = await self.find_by_id(participant_id)
+        if participant is not None:
+            participant.face_records = face_records
+            await self.session.merge(participant)
+            await self.session.flush()
+            await self.session.commit()
 
     async def find_completed_pending(self, limit: int = 100) -> list[ItemSetParticipant]:
         stmt = (

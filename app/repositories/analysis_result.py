@@ -64,7 +64,7 @@ class AnalysisResultRepository:
 
         await self._participant_repo.update_analysis_status(
             participant_id=participant_id,
-            status="COMPLETED",
+            status="Completed",
         )
 
         return analysis

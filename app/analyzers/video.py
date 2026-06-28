@@ -15,6 +15,7 @@ from app.schemas.features import FaceFeatures
 from app.core.logging import get_logger
 from app.utils.s3_downloader import S3VideoDownloader
 from app.utils.video import VideoProcessor
+from app.utils.video_merger import VideoMerger
 
 logger = get_logger(__name__)
 
@@ -28,28 +29,31 @@ class VideoAnalyzer(BaseAnalyzer):
         processor: VideoProcessor | None = None,
         face_analyzer: FaceAnalyzer | None = None,
         object_detector: ObjectDetectionAnalyzer | None = None,
+        merger: VideoMerger | None = None,
         fps: int = 1,
     ) -> None:
         self.downloader = downloader
         self.processor = processor or VideoProcessor()
         self.face_analyzer = face_analyzer or FaceAnalyzer()
         self.object_detector = object_detector
+        self.merger = merger or VideoMerger(temp_dir=settings.video_temp_dir)
         self.fps = fps
 
     async def analyze(
         self,
         face_records: list[dict[str, Any]],
         session_id: str | None = None,
-    ) -> tuple[FaceFeatures, list[FrameFaceResult], list[FrameDetectionResult]]:
+    ) -> tuple[FaceFeatures, list[FrameFaceResult], list[FrameDetectionResult], str | None]:
         """Run full video analysis pipeline.
 
         Returns:
-            Tuple of (aggregated FaceFeatures, per-frame face results, per-frame detection results).
+            Tuple of (aggregated FaceFeatures, per-frame face results, per-frame detection results, merged_video_s3_key).
         """
         if not face_records:
-            return FaceFeatures(), [], []
+            return FaceFeatures(), [], [], None
 
         sid = session_id or "unknown"
+        merged_s3_key: str | None = None
         logger.info(
             "video_analysis_started",
             url_count=len(face_records),
@@ -62,40 +66,92 @@ class VideoAnalyzer(BaseAnalyzer):
             )
         except Exception:
             logger.exception("video_download_failed", session_id=sid)
-            return FaceFeatures(), [], []
+            return FaceFeatures(), [], [], None
+
+        merged_path = None
+        try:
+            # Merge chunks into single video
+            session_dir = Path(settings.video_temp_dir) / sid
+            merged_path = str(session_dir / "merged_video.webm")
+            merged_path = self.merger.merge_chunks(local_paths, merged_path)
+
+            # Upload merged video to S3
+            merged_s3_key = self.downloader.upload_merged_video(
+                merged_path, sid
+            )
+            logger.info(
+                "merged_video_uploaded",
+                session_id=sid,
+                s3_key=merged_s3_key,
+            )
+
+            # Delete chunk files
+            self.merger.delete_chunks(local_paths)
+
+        except Exception:
+            logger.exception("video_merge_upload_failed", session_id=sid)
+            # Continue with analysis even if merge/upload fails
 
         all_frame_results: list[FrameFaceResult] = []
         detection_results: list[FrameDetectionResult] = []
         total_frames = 0
 
-        for local_path in local_paths:
-            if not self.processor.validate_video(local_path):
-                logger.warning("skipping_invalid_chunk", path=local_path)
-                continue
+        # Analyze the merged video instead of individual chunks
+        video_to_analyze = merged_path if merged_path and Path(merged_path).exists() else None
 
-            frame_dir = Path(local_path).parent / "frames"
-            frame_paths = self.processor.extract_frames(
-                local_path, str(frame_dir), fps=self.fps
-            )
+        if video_to_analyze:
+            if self.processor.validate_video(video_to_analyze):
+                frame_dir = Path(video_to_analyze).parent / "frames"
+                frame_paths = self.processor.extract_frames(
+                    video_to_analyze, str(frame_dir), fps=self.fps
+                )
 
-            for fpath in frame_paths:
-                frame = cv2.imread(fpath)
-                if frame is None:
+                for fpath in frame_paths:
+                    frame = cv2.imread(fpath)
+                    if frame is None:
+                        continue
+                    result = self.face_analyzer.analyze_frame(frame)
+                    all_frame_results.append(result)
+
+                    if self.object_detector is not None:
+                        det_result = self.object_detector.detect(frame)
+                        detection_results.append(det_result)
+
+                    total_frames += 1
+        else:
+            # Fallback to individual chunks if merge failed
+            for local_path in local_paths:
+                if not self.processor.validate_video(local_path):
+                    logger.warning("skipping_invalid_chunk", path=local_path)
                     continue
-                result = self.face_analyzer.analyze_frame(frame)
-                all_frame_results.append(result)
 
-                if self.object_detector is not None:
-                    det_result = self.object_detector.detect(frame)
-                    detection_results.append(det_result)
+                frame_dir = Path(local_path).parent / "frames"
+                frame_paths = self.processor.extract_frames(
+                    local_path, str(frame_dir), fps=self.fps
+                )
 
-                total_frames += 1
+                for fpath in frame_paths:
+                    frame = cv2.imread(fpath)
+                    if frame is None:
+                        continue
+                    result = self.face_analyzer.analyze_frame(frame)
+                    all_frame_results.append(result)
+
+                    if self.object_detector is not None:
+                        det_result = self.object_detector.detect(frame)
+                        detection_results.append(det_result)
+
+                    total_frames += 1
+
+        # Clean up session directory
+        self.merger.delete_session_dir(sid)
 
         logger.info(
             "video_analysis_complete",
             session_id=sid,
             frames_analyzed=total_frames,
-            chunks_processed=len(local_paths),
+            used_merged_video=video_to_analyze is not None,
+            merged_s3_key=merged_s3_key,
         )
 
         # Use analysis FPS (self.fps) so each analysis frame counts correctly
@@ -111,7 +167,7 @@ class VideoAnalyzer(BaseAnalyzer):
             features.tablet_detected_frames = det_features.tablet_detected_frames
             features.book_detected_frames = det_features.book_detected_frames
 
-        return features, all_frame_results, detection_results
+        return features, all_frame_results, detection_results, merged_s3_key
 
     def close(self) -> None:
         self.face_analyzer.close()

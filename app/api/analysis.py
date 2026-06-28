@@ -80,7 +80,7 @@ async def run_analysis(
 
     result = await orchestrator.run_analysis(participant_id)
     return RunAnalysisResponse(
-        status="completed",
+        status="Completed",
         analysis_id=str(result.id),
         risk_score=result.risk_score,
         risk_level=result.risk_level,
@@ -110,7 +110,7 @@ async def retry_analysis(
 
     result = await orchestrator.run_analysis(participant_id)
     return RunAnalysisResponse(
-        status="completed",
+        status="Completed",
         analysis_id=str(result.id),
         risk_score=result.risk_score,
         risk_level=result.risk_level,
