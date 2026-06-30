@@ -20,16 +20,7 @@ class VideoMerger:
     ) -> str:
         """Merge sorted video chunks into a single video file.
 
-        Args:
-            chunk_paths: Sorted list of chunk file paths.
-            output_path: Path for the merged output file.
-
-        Returns:
-            Path to the merged video file.
-
-        Raises:
-            FileNotFoundError: If any chunk file is missing.
-            RuntimeError: If ffmpeg merge fails.
+        Uses re-encoding to handle webm chunks with different parameters.
         """
         if not chunk_paths:
             raise ValueError("No chunks to merge")
@@ -57,13 +48,19 @@ class VideoMerger:
                 safe_path = path.replace("'", "'\\''")
                 f.write(f"file '{safe_path}'\n")
 
+        # Re-encode to MP4/H.264 for universal OpenCV compatibility
         cmd = [
             "ffmpeg",
             "-y",
             "-f", "concat",
             "-safe", "0",
             "-i", concat_file,
-            "-c", "copy",
+            "-c:v", "libx264",
+            "-crf", "28",
+            "-preset", "fast",
+            "-pix_fmt", "yuv420p",
+            "-an",
+            "-movflags", "+faststart",
             output_path,
         ]
 
@@ -81,6 +78,12 @@ class VideoMerger:
                 timeout=600,
             )
             if result.returncode != 0:
+                # Log the error but don't raise — let fallback handle it
+                logger.error(
+                    "ffmpeg_merge_failed",
+                    returncode=result.returncode,
+                    stderr=result.stderr[-500:] if result.stderr else "",
+                )
                 raise RuntimeError(
                     f"ffmpeg failed (code {result.returncode}): {result.stderr}"
                 )
@@ -97,11 +100,7 @@ class VideoMerger:
         return output_path
 
     def delete_chunks(self, chunk_paths: list[str]) -> int:
-        """Delete chunk files after merging.
-
-        Returns:
-            Number of files deleted.
-        """
+        """Delete chunk files after merging."""
         deleted = 0
         for path in chunk_paths:
             try:

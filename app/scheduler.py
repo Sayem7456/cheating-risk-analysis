@@ -55,6 +55,8 @@ def discover_and_dispatch() -> int:
                     "FROM item_set_participant "
                     "WHERE is_evaluated = TRUE "
                     "AND analysis_status IS NULL "
+                    "AND face_records IS NOT NULL "
+                    "AND jsonb_array_length(face_records::jsonb) > 0 "
                     "LIMIT :limit"
                 ),
                 {"limit": MAX_DISPATCH_PER_RUN},

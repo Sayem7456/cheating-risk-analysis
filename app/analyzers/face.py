@@ -113,19 +113,20 @@ class FaceAnalyzer:
             [r.face_detected for r in results], target=False
         )
 
-        # Screen attention: gaze is "center" (face detected + looking forward)
+        # Screen attention: gaze is "center" or "down" (looking at keyboard is normal)
         attention_frames = sum(
             1 for r in results
-            if r.face_detected and r.gaze_direction == "center"
+            if r.face_detected and r.gaze_direction in ("center", "down")
         )
         screen_attention_ratio = round(
             attention_frames / max(total_frames, 1), 4
         )
 
         # Look away: face detected but not looking center
+        # Exclude "down" gaze — looking at keyboard is normal typing behavior
         look_away_results = [
             r for r in results
-            if r.face_detected and r.gaze_direction != "center"
+            if r.face_detected and r.gaze_direction not in ("center", "down")
         ]
         look_away_duration = round(
             len(look_away_results) * sec_per_frame, 2
@@ -228,7 +229,7 @@ class FaceAnalyzer:
     def _count_side_glances(
         self, results: list[FrameFaceResult]
     ) -> int:
-        """Count contiguous sequences of looking left or right."""
+        """Count contiguous sequences of looking left or right (excluding up/down)."""
         count = 0
         in_glance = False
         for r in results:

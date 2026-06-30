@@ -126,6 +126,14 @@ class AnalysisOrchestrator:
             activity_log = participant.activity_log or []
             face_records = participant.face_records or []
 
+            logger.info(
+                "participant_data_loaded",
+                participant_id=participant_id,
+                activity_log_count=len(activity_log),
+                face_records_count=len(face_records),
+                face_records_sample=face_records[:1] if face_records else [],
+            )
+
             # Step 2 — analyze activity logs
             t0 = time.monotonic()
             activity_features = await _retry(

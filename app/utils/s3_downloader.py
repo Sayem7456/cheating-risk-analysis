@@ -60,9 +60,9 @@ class S3VideoDownloader:
         sorted_chunks = sorted(chunks, key=lambda c: c.get("chunk_index", 0))
         local_paths: list[str] = []
 
-        for chunk in sorted_chunks:
+        for idx, chunk in enumerate(sorted_chunks):
             s3_key = chunk.get("s3_key", "")
-            chunk_index = chunk.get("chunk_index", 0)
+            chunk_index = chunk.get("chunk_index", idx)
             ext = os.path.splitext(s3_key)[1] or ".webm"
             local_path = str(session_dir / f"chunk_{chunk_index:04d}{ext}")
 
@@ -147,7 +147,7 @@ class S3VideoDownloader:
         self,
         local_path: str,
         session_id: str,
-        filename: str = "merged_video.webm",
+        filename: str = "merged_video.mp4",
     ) -> str:
         """Upload merged video to S3 and return the S3 key.
 
